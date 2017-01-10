@@ -43,7 +43,7 @@
 				SUPPORTED_10000baseT_Full)
 
 #ifndef PHY_ANEG_TIMEOUT
-#define PHY_ANEG_TIMEOUT	4000
+#define PHY_ANEG_TIMEOUT	10000
 #endif
 
 
@@ -255,6 +255,7 @@ int phy_atheros_init(void);
 int phy_broadcom_init(void);
 int phy_cortina_init(void);
 int phy_davicom_init(void);
+int phy_lantiq_init(void);
 int phy_et1011c_init(void);
 int phy_lxt_init(void);
 int phy_marvell_init(void);
