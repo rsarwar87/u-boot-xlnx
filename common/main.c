@@ -63,7 +63,6 @@ void main_loop(void)
 	if (cli_process_fdt(&s))
 		cli_secure_boot_cmd(s);
 
-	setenv("bootdelay", "0");
 	setenv("fdt_high", "0x1E000000");
 	setenv("sdboot", "echo Importing environment from SD... && mmcinfo && fatload mmc 0 0x2000000 uEnv.txt && env import -t 0x2000000 ${filesize} && boot");
 
