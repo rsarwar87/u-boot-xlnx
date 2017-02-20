@@ -28,7 +28,7 @@
 
 #ifdef CONFIG_BOOTDELAY
 #undef CONFIG_BOOTDELAY
-#define CONFIG_BOOTDELAY 0
 #endif
+#define CONFIG_BOOTDELAY 0
 
 #endif /* __CONFIG_ZYNQ_RED_PITAYA_H */
