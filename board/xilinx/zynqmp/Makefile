@@ -7,7 +7,7 @@
 
 obj-y	:= zynqmp.o
 
-hw-platform-y :=$(shell echo $(CONFIG_SYS_CONFIG_NAME))
+hw-platform-y :=$(shell echo $(CONFIG_DEFAULT_DEVICE_TREE))
 
 init-objs := $(if $(wildcard $(srctree)/$(src)/$(hw-platform-y)/psu_init_gpl.c),\
 	$(hw-platform-y)/psu_init_gpl.o)
@@ -20,6 +20,7 @@ $(warning Put custom psu_init_gpl.c/h to board/xilinx/zynqmp/custom_hw_platform/
 endif
 endif
 
+obj-$(CONFIG_ZYNQ_SDHCI) += tap_delays.o
 obj-$(CONFIG_SPL_BUILD) += $(init-objs)
 
 # Suppress "warning: function declaration isn't a prototype"
