@@ -12,9 +12,7 @@
 #define __CONFIG_ZYNQ_MARS_H
 
 #define CONFIG_CPU_FREQ_HZ		800000000
-#define CONFIG_MERCURY_ZX
 
-#define CONFIG_ZYNQ_USB
 #define CONFIG_ZYNQ_SDHCI0
 
 /* Select Micrel PHY */
