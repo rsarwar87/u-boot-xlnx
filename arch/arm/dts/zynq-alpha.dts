@@ -1,7 +1,8 @@
 /*
- * Enclustra Mars ZX SOM devicetree
+ * Koheron Alpha devicetree
  *
  * Copyright (C) 2015 Antmicro Ltd
+ * Copyright (C) 2017 Koheron SAS
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
@@ -9,8 +10,8 @@
 #include "zynq-7000.dtsi"
 
 / {
-	model = "Enclustra Mars family SOM's";
-	compatible = "xlnx,zynq-mars","xlnx,zynq-7000";
+	model = "Koheron Alpha";
+	compatible = "xlnx,zynq-alpha","xlnx,zynq-7000";
 
 	aliases {
 		serial0 = &uart0;
