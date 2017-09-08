@@ -1,7 +1,8 @@
 /*
- * Enclustra Mars ZX SOM devicetree
+ * MYIR MYD-C7Z015 devicetree
  *
  * Copyright (C) 2015 Antmicro Ltd
+ * Copyright (C) 2017 Koheron SAS
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
@@ -10,16 +11,16 @@
 
 / {
 	model = "Enclustra Mars family SOM's";
-	compatible = "xlnx,zynq-mars","xlnx,zynq-7000";
+	compatible = "xlnx,zynq-mydc7z015","xlnx,zynq-7000";
 
 	aliases {
 		serial0 = &uart0;
-        mmc0 = &sdhci0;
+        	mmc0 = &sdhci0;
 	};
 
 	memory {
 		device_type = "memory";
-		reg = <0 0x1E000000>;
+		reg = <0 0x3E000000>;
 	};
 
 	chosen {

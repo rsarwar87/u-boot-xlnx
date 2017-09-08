@@ -1,8 +1,9 @@
 /*
  * (C) Copyright 2013 Xilinx, Inc.
  * (C) Copyright 2015 Antmicro Ltd
+ * (C) Copyright 2017 Koheron SAS
  *
- * Configuration for Enclustra Mars family SOM's
+ * Configuration for MYIR MYD-C7Z015
  * See zynq-common.h for Zynq common configs
  *
  * SPDX-License-Identifier:	GPL-2.0+
