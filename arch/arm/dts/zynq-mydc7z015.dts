@@ -10,11 +10,11 @@
 #include "zynq-7000.dtsi"
 
 / {
-	model = "Enclustra Mars family SOM's";
+	model = "MYIR MYD-C-7Z015 board";
 	compatible = "xlnx,zynq-mydc7z015","xlnx,zynq-7000";
 
 	aliases {
-		serial0 = &uart0;
+		serial0 = &uart1;
         	mmc0 = &sdhci0;
 	};
 
@@ -40,7 +40,7 @@
 	status = "okay";
 };
 
-&uart0 {
+&uart1 {
 	u-boot,dm-pre-reloc;
 	status = "okay";
 };
