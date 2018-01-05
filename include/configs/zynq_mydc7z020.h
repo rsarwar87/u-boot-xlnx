@@ -3,7 +3,7 @@
  * (C) Copyright 2015 Antmicro Ltd
  * (C) Copyright 2017 Koheron SAS
  *
- * Configuration for MYIR MYD-C7Z015
+ * Configuration for MYIR MYD-C7Z020
  * See zynq-common.h for Zynq common configs
  *
  * SPDX-License-Identifier:	GPL-2.0+
