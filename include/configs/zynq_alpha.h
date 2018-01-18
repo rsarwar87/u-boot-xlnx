@@ -40,7 +40,7 @@
 	"importbootenv=echo Importing environment from SD ...; " \
 		"env import -t ${loadbootenv_addr} $filesize\0" \
 	"sd_uEnvtxt_existence_test=test -e mmc 0 /uEnv.txt\0" \
-	"preboot=preboot=env import -t 0xFFFFFC00" \
+	"preboot=env import -t 0xFFFFFC00" \
 	"mmc_loadbit=echo Loading bitstream from SD/MMC/eMMC to RAM.. && " \
 		"mmcinfo && " \
 		"load mmc 0 ${loadbit_addr} ${bitstream_image} && " \
