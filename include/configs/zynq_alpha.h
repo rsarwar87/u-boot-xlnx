@@ -61,7 +61,7 @@
 			"load mmc 0 ${devicetree_load_address} ${devicetree_image} && " \
 			"load mmc 0 ${ramdisk_load_address} ${ramdisk_image} && " \
 			"bootm ${kernel_load_address} ${ramdisk_load_address} ${devicetree_load_address}; " \
-		"fi\0" \
+		"fi\0"
 #endif
 
 #define CONFIG_ZYNQ_SDHCI0
