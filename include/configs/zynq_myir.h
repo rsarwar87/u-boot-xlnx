@@ -1,16 +1,16 @@
 /*
  * (C) Copyright 2013 Xilinx, Inc.
  * (C) Copyright 2015 Antmicro Ltd
- * (C) Copyright 2015 Koheron SAS
+ * (C) Copyright 2017 Koheron SAS
  *
- * Configuration for Koheron Alpha
+ * Configuration for MYIR MYD-C7Z015 and MYD-C7Z020
  * See zynq-common.h for Zynq common configs
  *
  * SPDX-License-Identifier:	GPL-2.0+
  */
 
-#ifndef __CONFIG_ZYNQ_ALPHA_H
-#define __CONFIG_ZYNQ_ALPHA_H
+#ifndef __CONFIG_ZYNQ_MYIR_H
+#define __CONFIG_ZYNQ_MYIR_H
 
 #include <configs/zynq-common.h>
 
@@ -55,6 +55,7 @@
 		"fi\0" \
 	"sdboot=echo Importing environment from SD... && mmcinfo && fatload mmc 0 0x2000000 uEnv.txt && env import -t 0x2000000 ${filesize} && boot"
 
+#define CONFIG_CPU_FREQ_HZ		800000000
 
 #define CONFIG_ZYNQ_SDHCI0
 
@@ -68,4 +69,4 @@
 #undef CONFIG_PHY_MARVELL
 #endif
 
-#endif /* __CONFIG_ZYNQ_ALPHA_H */
+#endif /* __CONFIG_ZYNQ_MYIR_H */
