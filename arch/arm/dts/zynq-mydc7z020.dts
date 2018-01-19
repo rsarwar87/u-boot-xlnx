@@ -1,5 +1,5 @@
 /*
- * MYIR MYD-C7Z015 devicetree
+ * MYIR MYD-C7Z020 devicetree
  *
  * Copyright (C) 2015 Antmicro Ltd
  * Copyright (C) 2017 Koheron SAS
@@ -10,8 +10,8 @@
 #include "zynq-7000.dtsi"
 
 / {
-	model = "MYIR MYD-C-7Z015 board";
-	compatible = "xlnx,zynq-mydc7z015","xlnx,zynq-7000";
+	model = "MYIR MYD-C-7Z020 board";
+	compatible = "xlnx,zynq-mydc7z020","xlnx,zynq-7000";
 
 	aliases {
 		serial0 = &uart1;

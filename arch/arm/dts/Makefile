@@ -109,7 +109,8 @@ dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
 	zynq-zc770-xm013.dtb \
 	zynq-alpha.dtb \
     zynq-red-pitaya.dtb \
-	zynq-mydc7z015.dtb
+	zynq-mydc7z015.dtb \
+	zynq-mydc7z020.dtb
 dtb-$(CONFIG_ARCH_ZYNQMP) += \
 	zynqmp-ep108.dtb			\
 	zynqmp-zcu100-revB.dtb			\
