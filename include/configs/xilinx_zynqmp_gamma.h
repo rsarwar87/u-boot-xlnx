@@ -11,6 +11,7 @@
 #define __CONFIG_ZYNQMP_GAMMA_H
 
 #define CONFIG_ZYNQ_SDHCI1
+#define CONFIG_SYS_I2C_ZYNQ
 #define CONFIG_ZYNQ_I2C0
 
 #define CONFIG_SYS_I2C_SPEED	100000
@@ -30,6 +31,9 @@
 /* Select Micrel PHY */
 #define CONFIG_PHY_MICREL
 
+#ifdef PHY_ANEG_TIMEOUT
+#undef PHY_ANEG_TIMEOUT
+#endif
 #define PHY_ANEG_TIMEOUT	8000	/* PHY needs a longer aneg time */
 
 /* Unselect Marvell PHY (selected by zynq-common) */
