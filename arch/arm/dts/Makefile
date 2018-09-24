@@ -153,7 +153,7 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
 	zynq-alpha.dtb \
 	zynq-mydc7z015.dtb \
 	zynq-mydc7z020.dtb \
-	zynq-te0745.dtb
+	zynq-te0745.dtb \
 	zynq-zed.dtb \
 	zynq-zturn-myir.dtb \
 	zynq-zybo.dtb
