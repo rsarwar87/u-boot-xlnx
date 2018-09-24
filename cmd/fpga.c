@@ -18,16 +18,18 @@
 static int fpga_get_op(char *opstr);
 
 /* Local defines */
-#define FPGA_NONE   -1
-#define FPGA_INFO   0
-#define FPGA_LOAD   1
-#define FPGA_LOADB  2
-#define FPGA_DUMP   3
-#define FPGA_LOADMK 4
-#define FPGA_LOADP  5
-#define FPGA_LOADBP 6
-#define FPGA_LOADFS 7
-#define FPGA_LOADS  8
+enum {
+	FPGA_NONE = -1,
+	FPGA_INFO,
+	FPGA_LOAD,
+	FPGA_LOADB,
+	FPGA_DUMP,
+	FPGA_LOADMK,
+	FPGA_LOADP,
+	FPGA_LOADBP,
+	FPGA_LOADFS,
+	FPGA_LOADS,
+};
 
 /* ------------------------------------------------------------------------- */
 /* command form:
@@ -42,8 +44,8 @@ int do_fpga(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 	int op, dev = FPGA_INVALID_DEVICE;
 	size_t data_size = 0;
 	void *fpga_data = NULL;
-	char *devstr = getenv("fpga");
-	char *datastr = getenv("fpgadata");
+	char *devstr = env_get("fpga");
+	char *datastr = env_get("fpgadata");
 	int rc = FPGA_FAIL;
 	int wrong_parms = 0;
 #if defined(CONFIG_FIT)
@@ -75,10 +77,22 @@ int do_fpga(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 #endif
 #if defined(CONFIG_CMD_FPGA_LOAD_SECURE)
 	case 8:
-		fpga_sec_info.sec_img_type = simple_strtoul(argv[7], NULL, 16);
+		fpga_sec_info.userkey_addr = (u8 *)(uintptr_t)
+					     simple_strtoull(argv[7], NULL, 16);
 	case 7:
-		fpga_sec_info.ivaddr_size = argv[6];
-		fpga_sec_info.keyaddr_size = argv[5];
+		fpga_sec_info.encflag = (u8)simple_strtoul(argv[6], NULL, 16);
+		if (((fpga_sec_info.encflag == FPGA_ENC_USR_KEY) &&
+		     !fpga_sec_info.userkey_addr) ||
+		    (fpga_sec_info.encflag > FPGA_NO_ENC)) {
+			op = FPGA_NONE;
+			break;
+		}
+	case 6:
+		fpga_sec_info.authflag = (u8)simple_strtoul(argv[5], NULL, 16);
+		if (fpga_sec_info.authflag > FPGA_NO_AUTH) {
+			op = FPGA_NONE;
+			break;
+		}
 #endif
 	case 5:		/* fpga <op> <dev> <data> <datasize> */
 		data_size = simple_strtoul(argv[4], NULL, 16);
@@ -157,8 +171,11 @@ int do_fpga(cmd_tbl_t *cmdtp, int flag, int argc, char *const argv[])
 #endif
 #if defined(CONFIG_CMD_FPGA_LOAD_SECURE)
 	case FPGA_LOADS:
-		if (!fpga_sec_info.keyaddr_size || !fpga_sec_info.keyaddr_size)
+		if (fpga_sec_info.authflag == FPGA_NO_AUTH &&
+		    fpga_sec_info.encflag == FPGA_NO_ENC) {
 			wrong_parms = 1;
+			break;
+		}
 #endif
 	case FPGA_LOAD:
 	case FPGA_LOADP:
@@ -402,13 +419,17 @@ U_BOOT_CMD(fpga, 8, 1, do_fpga,
 #endif
 #if defined(CONFIG_CMD_FPGA_LOAD_SECURE)
 	   "Load encrypted bitstream (Xilinx only)\n"
-	   "  loads [dev] [address] [size] [key/sigaddr:size]\n"
-	   "        [IV/PPKaddr:size] [secureimgtype]\n"
-	   "Loads the secure bistreams(authenticated/encrypted)image of\n"
-	   "[size] from [address] using key/signature(key for encrypted\n"
-	   "bitstreams and signature for authenticated bitstreams) from\n"
-	   "address whose :size and IV/PPK at address with size. The secure\n"
-	   "image type specifies whether it is authenticated/encrypted\n"
-	   "(0-enc, 1-auth) type of bitstream\n"
+	   "  loads [dev] [address] [size] [auth-OCM-0/DDR-1/noauth-2]\n"
+	   "        [enc-devkey(0)/userkey(1)/nenc(2) [Userkey address]\n"
+	   "Loads the secure bistreams(authenticated/encrypted/both\n"
+	   "encrypted and encrypted) of [size] from [address].\n"
+	   "The auth-OCM/DDR flag specifies to perform authentication\n"
+	   "in OCM or in DDR. 0 for OCM, 1 for DDR, 2 for no authentication.\n"
+	   "The enc flag specifies which key to be used for decryption\n"
+	   "0-device key, 1-user key, 2-no encryption.\n"
+	   "The optional Userkey address specifies from which address key\n"
+	   "has to be used for decryption if user key is selected.\n"
+	   "NOTE: the sceure bitstream has to be created using xilinx\n"
+	   "bootgen tool only.\n"
 #endif
 );

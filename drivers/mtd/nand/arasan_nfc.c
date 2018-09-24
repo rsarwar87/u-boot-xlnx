@@ -11,7 +11,7 @@
 #include <asm/io.h>
 #include <linux/errno.h>
 #include <linux/mtd/mtd.h>
-#include <linux/mtd/nand.h>
+#include <linux/mtd/rawnand.h>
 #include <linux/mtd/partitions.h>
 #include <linux/mtd/nand_ecc.h>
 #include <asm/arch/hardware.h>
@@ -795,10 +795,11 @@ static int arasan_nand_erase(struct arasan_nand_command_format *curr_cmd,
 
 	writel(reg_val, &arasan_nand_base->cmd_reg);
 
-	page = (page_addr << ARASAN_NAND_MEM_ADDR1_PAGE_SHIFT) &
-		ARASAN_NAND_MEM_ADDR1_PAGE_MASK;
+	page = (page_addr >> ARASAN_NAND_MEM_ADDR1_PAGE_SHIFT) &
+		ARASAN_NAND_MEM_ADDR1_COL_MASK;
 	column = page_addr & ARASAN_NAND_MEM_ADDR1_COL_MASK;
-	writel(page | column, &arasan_nand_base->memadr_reg1);
+	writel(column | (page << ARASAN_NAND_MEM_ADDR1_PAGE_SHIFT),
+	       &arasan_nand_base->memadr_reg1);
 
 	reg_val = readl(&arasan_nand_base->memadr_reg2);
 	reg_val &= ~ARASAN_NAND_MEM_ADDR2_PAGE_MASK;
@@ -1133,7 +1134,7 @@ static void arasan_check_ondie(struct mtd_info *mtd)
 static int arasan_nand_ecc_init(struct mtd_info *mtd)
 {
 	int found = -1;
-	u32 regval, eccpos_start, i;
+	u32 regval, eccpos_start, i, eccaddr;
 	struct nand_chip *nand_chip = mtd_to_nand(mtd);
 
 	for (i = 0; i < ARRAY_SIZE(ecc_matrix); i++) {
@@ -1152,7 +1153,10 @@ static int arasan_nand_ecc_init(struct mtd_info *mtd)
 	if (found < 0)
 		return 1;
 
-	regval = ecc_matrix[found].eccaddr |
+	eccaddr = mtd->writesize + mtd->oobsize -
+		  ecc_matrix[found].eccsize;
+
+	regval = eccaddr |
 		 (ecc_matrix[found].eccsize << ARASAN_NAND_ECC_SIZE_SHIFT) |
 		 (ecc_matrix[found].bch << ARASAN_NAND_ECC_BCH_SHIFT);
 	writel(regval, &arasan_nand_base->ecc_reg);
