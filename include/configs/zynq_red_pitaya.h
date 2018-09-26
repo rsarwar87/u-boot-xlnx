@@ -26,4 +26,8 @@
 #define CONFIG_ENV_SIZE		1024 /* Total Size of Environment Sector */
 #define CONFIG_ENV_OFFSET	(2048*3) /* WP area starts at last 1/4 of 8k eeprom */
 
+#define CONFIG_EXTRA_ENV_SETTINGS	\
+        "fdt_high=0x1E000000\0"	\
+	"sdboot=echo Importing environment from SD... && mmcinfo && fatload mmc 0 0x2000000 uEnv.txt && env import -t 0x2000000 ${filesize} && boot"
+
 #endif /* __CONFIG_ZYNQ_RED_PITAYA_H */
