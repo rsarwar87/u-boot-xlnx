@@ -21,6 +21,10 @@
 /* device numbers must be non-negative */
 #define FPGA_INVALID_DEVICE	-1
 
+#define FPGA_ENC_USR_KEY	1
+#define FPGA_NO_ENC		2
+#define FPGA_NO_AUTH		2
+
 /* root data type defintions */
 typedef enum {			/* typedef fpga_type */
 	fpga_min_type,		/* range check value */
@@ -44,9 +48,9 @@ typedef struct {                /* typedef fpga_desc */
 } fpga_fs_info;
 
 typedef struct {
-	char *keyaddr_size;
-	char *ivaddr_size;
-	char sec_img_type;
+	u8 *userkey_addr;
+	u8 authflag;
+	u8 encflag;
 } fpga_secure_info;
 
 typedef enum {
@@ -60,6 +64,7 @@ void fpga_init(void);
 int fpga_add(fpga_type devtype, void *desc);
 int fpga_count(void);
 const fpga_desc *const fpga_get_desc(int devnum);
+int fpga_is_partial_data(int devnum, size_t img_len);
 int fpga_load(int devnum, const void *buf, size_t bsize,
 	      bitstream_type bstype);
 int fpga_fsload(int devnum, const void *buf, size_t size,

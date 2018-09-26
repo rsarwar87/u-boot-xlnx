@@ -135,6 +135,7 @@ struct spi_slave {
 	u8 dio;
 	u32 bytemode;
 	u32 flags;
+	u8 dummy_bytes;
 #define SPI_XFER_BEGIN		BIT(0)	/* Assert CS before transfer */
 #define SPI_XFER_END		BIT(1)	/* Deassert CS after transfer */
 #define SPI_XFER_ONCE		(SPI_XFER_BEGIN | SPI_XFER_END)
@@ -591,7 +592,7 @@ int spi_find_chip_select(struct udevice *bus, int cs, struct udevice **devp);
  * @node:	Node offset to read from
  * @plat:	Place to put the decoded information
  */
-int spi_slave_ofdata_to_platdata(const void *blob, int node,
+int spi_slave_ofdata_to_platdata(struct udevice *dev,
 				 struct dm_spi_slave_platdata *plat);
 
 /**
