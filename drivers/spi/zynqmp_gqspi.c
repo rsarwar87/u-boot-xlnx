@@ -23,6 +23,20 @@
 #define GQSPI_CONFIG_DMA_MODE		(2 << 30)
 #define GQSPI_CONFIG_CPHA_MASK		BIT(2)
 #define GQSPI_CONFIG_CPOL_MASK		BIT(1)
+DECLARE_GLOBAL_DATA_PTR;
+
+DECLARE_GLOBAL_DATA_PTR;
+
+#define ZYNQMP_QSPI_GFIFO_STRT_MODE_MASK	(1 << 29)
+#define ZYNQMP_QSPI_CONFIG_MODE_EN_MASK	(3 << 30)
+#define ZYNQMP_QSPI_CONFIG_DMA_MODE	(2 << 30)
+#define ZYNQMP_QSPI_CONFIG_CPHA_MASK	(1 << 2)
+#define ZYNQMP_QSPI_CONFIG_CPOL_MASK	(1 << 1)
+
+/* QSPI MIO's count for different connection topologies */
+#define ZYNQMP_QSPI_MIO_NUM_QSPI0		6
+#define ZYNQMP_QSPI_MIO_NUM_QSPI1		5
+#define ZYNQMP_QSPI_MIO_NUM_QSPI1_CS	1
 
 /*
  * QSPI Interrupt Registers bit Masks
@@ -169,6 +183,7 @@ struct zynqmp_qspi_platdata {
 	struct zynqmp_qspi_dma_regs *dma_regs;
 	u32 frequency;
 	u32 speed_hz;
+	u8 bytemode;
 	unsigned int is_dual;
 	unsigned int io_mode;
 };
@@ -187,6 +202,7 @@ struct zynqmp_qspi_priv {
 	unsigned int bus;
 	unsigned int stripe;
 	unsigned int cs_change:1;
+	u8 bytemode;
 	unsigned int dummy_bytes;
 	unsigned int tx_rx_mode;
 	unsigned int io_mode;
@@ -201,10 +217,30 @@ static int zynqmp_qspi_ofdata_to_platdata(struct udevice *bus)
 
 	debug("%s\n", __func__);
 
-	plat->regs = (struct zynqmp_qspi_regs *)(devfdt_get_addr(bus) +
-						 GQSPI_REG_OFFSET);
-	plat->dma_regs = (struct zynqmp_qspi_dma_regs *)
-			  (devfdt_get_addr(bus) + GQSPI_DMA_REG_OFFSET);
+	plat->regs = (struct zynqmp_qspi_regs *)(devfdt_get_addr(bus) + 0x100);
+	plat->dma_regs = (struct zynqmp_qspi_dma_regs *)(devfdt_get_addr(bus) +
+							 0x800);
+	plat->bytemode = fdtdec_get_int(gd->fdt_blob, dev_of_offset(bus),
+					"bytemode", SPI_4BYTE_MODE);
+
+	ret = clk_get_by_index(bus, 0, &clk);
+	if (ret < 0) {
+		dev_err(dev, "failed to get clock\n");
+		return ret;
+	}
+
+	clock = clk_get_rate(&clk);
+	if (IS_ERR_VALUE(clock)) {
+		dev_err(dev, "failed to get rate\n");
+		return clock;
+	}
+	debug("%s: CLK %ld\n", __func__, clock);
+
+	ret = clk_enable(&clk);
+	if (ret && ret != -ENOSYS) {
+		dev_err(dev, "failed to enable clock\n");
+		return ret;
+	}
 
 	is_dual = fdtdec_get_int(gd->fdt_blob, dev_of_offset(bus), "is-dual", -1);
 	if (is_dual < 0)
@@ -433,6 +469,8 @@ static int zynqmp_qspi_child_pre_probe(struct udevice *bus)
 
 	slave->option = priv->is_dual;
 	slave->bytemode = SPI_4BYTE_MODE;
+	slave->mode = plat->tx_rx_mode;
+	slave->bytemode = priv->bytemode;
 
 	return 0;
 }
@@ -449,6 +487,7 @@ static int zynqmp_qspi_probe(struct udevice *bus)
 
 	priv->regs = plat->regs;
 	priv->dma_regs = plat->dma_regs;
+	priv->bytemode = plat->bytemode;
 	priv->is_dual = plat->is_dual;
 	priv->io_mode = plat->io_mode;
 
@@ -530,6 +569,7 @@ static int zynqmp_qspi_fill_tx_fifo(struct zynqmp_qspi_priv *priv, u32 size)
 	debug("TxFIFO: 0x%x, size: 0x%x\n", readl(&regs->isr),
 	      size);
 
+<<<<<<< HEAD:drivers/spi/zynqmp_gqspi.c
 	config_reg = readl(&regs->confr);
 	/* Manual start if needed */
 	if (config_reg & GQSPI_GEN_FIFO_STRT_MOD) {
@@ -553,6 +593,36 @@ static int zynqmp_qspi_fill_tx_fifo(struct zynqmp_qspi_priv *priv, u32 size)
 			writel(*buf, &regs->txd0r);
 			buf++;
 			size -= 4;
+=======
+	while (size && timeout) {
+		if (readl(&regs->isr) &
+			ZYNQMP_QSPI_IXR_TXNFULL_MASK) {
+			if (size >= 4) {
+				writel(*buf, &regs->txd0r);
+				buf++;
+				size -= 4;
+			} else {
+				switch (size) {
+				case 1:
+					data  = ((u8 *)buf)[0];
+					data |= 0xFFFFFF00;
+					break;
+				case 2:
+					data  = ((u8 *)buf)[0];
+					data |= ((u8 *)buf)[1] << 8;
+					data |= 0xFFFF0000;
+					break;
+				case 3:
+					data  = ((u8 *)buf)[0];
+					data |= ((u8 *)buf)[1] << 8;
+					data |= ((u8 *)buf)[2] << 16;
+					data |= 0xFF000000;
+					break;
+				}
+				writel(data, &regs->txd0r);
+				size = 0;
+			}
+>>>>>>> tags/v1.8.2:drivers/spi/zynqmp_qspi.c
 		} else {
 			switch (size) {
 			case 1:
@@ -587,6 +657,9 @@ static void zynqmp_qspi_genfifo_cmd(struct zynqmp_qspi_priv *priv)
 	u8 command = 1;
 	u32 gen_fifo_cmd;
 	u32 bytecount = 0;
+
+	if (priv->bytemode == SPI_3BYTE_MODE)
+		priv->dummy_bytes = 0;
 
 	if (priv->dummy_bytes)
 		priv->len -= priv->dummy_bytes;

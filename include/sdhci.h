@@ -252,6 +252,7 @@
 #define MMC_CAP_NEEDS_POLL      BIT(9)
 #define MMC_CAP_CD_ACTIVE_HIGH  BIT(10)
 
+#define SDHCI_QUIRK_EMMC_INIT		(1 << 11)
 /* to make gcc happy */
 struct sdhci_host;
 

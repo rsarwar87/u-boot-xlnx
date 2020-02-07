@@ -321,7 +321,7 @@ int env_set_hex(const char *varname, ulong value)
 {
 	char str[17];
 
-	sprintf(str, "%lx", value);
+	sprintf(str, "0x%lx", value);
 	return env_set(varname, str);
 }
 

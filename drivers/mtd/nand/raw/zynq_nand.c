@@ -1046,6 +1046,9 @@ static int zynq_nand_check_is_16bit_bw_flash(void)
 	return is_16bit_bw;
 }
 
+#if defined(ENCLUSTRA_MARS_ZX) || defined(ENCLUSTRA_MERCURY_ZX)
+extern void zx_set_storage (int store);
+#endif
 static int zynq_nand_init(struct nand_chip *nand_chip, int devnum)
 {
 	struct zynq_nand_info *xnand;
@@ -1064,6 +1067,9 @@ static int zynq_nand_init(struct nand_chip *nand_chip, int devnum)
 		printf("%s: failed to allocate\n", __func__);
 		goto fail;
 	}
+#if defined (ENCLUSTRA_MARS_ZX) || defined(ENCLUSTRA_MERCURY_ZX)
+        zx_set_storage(ZX_NAND);
+#endif
 
 	xnand->nand_base = (void __iomem *)ZYNQ_NAND_BASEADDR;
 	mtd = nand_to_mtd(nand_chip);
@@ -1168,7 +1174,7 @@ static int zynq_nand_init(struct nand_chip *nand_chip, int devnum)
 		nand_chip->ecc.bytes = 0;
 
 		/* NAND with on-die ECC supports subpage reads */
-		nand_chip->options |= NAND_SUBPAGE_READ;
+		nand_chip->options |= NAND_SUBPAGE_READ |  NAND_NO_SUBPAGE_WRITE;
 
 		/* On-Die ECC spare bytes offset 8 is used for ECC codes */
 		if (ondie_ecc_enabled) {

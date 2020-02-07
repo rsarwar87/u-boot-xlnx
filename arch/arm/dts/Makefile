@@ -165,6 +165,11 @@ dtb-$(CONFIG_ARCH_ZYNQ) += \
 	zynq-mydc7z015.dtb \
 	zynq-mydc7z020.dtb \
 	zynq-te0745.dtb \
+	zynq-mars-zx3.dtb \
+	zynq-mars-zx3-sta.dtb \
+	zynq-mars-zx2.dtb \
+	zynq-mercury.dtb \
+	zynq-cosmos-xzq10.dtb \
 	zynq-zed.dtb \
 	zynq-zturn.dtb \
 	zynq-zybo.dtb \
@@ -211,6 +216,13 @@ dtb-$(CONFIG_ARCH_ZYNQMP) += \
 	zynqmp-zc1751-xm016-dc2.dtb		\
 	zynqmp-zc1751-xm017-dc3.dtb		\
 	zynqmp-zc1751-xm018-dc4.dtb		\
+	zynqmp-zc1751-xm019-dc5.dtb		\
+	mercury-xu1.dtb				\
+	mercury-xu5.dtb				\
+	mercury-xu7.dtb				\
+	mercury-xu8.dtb				\
+	mars-xu3.dtb				\
+	zynqmp-mini-nand.dtb \
 	zynqmp-zc1751-xm019-dc5.dtb
 dtb-$(CONFIG_ARCH_VERSAL) += \
 	versal-mini.dtb \

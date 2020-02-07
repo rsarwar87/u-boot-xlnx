@@ -104,7 +104,9 @@
 /* I2C */
 #if defined(CONFIG_SYS_I2C_ZYNQ)
 # define CONFIG_SYS_I2C
-#endif
+#if defined(CONFIG_MMC_SDHCI_ZYNQ) || defined(CONFIG_ZYNQ_USB)
+# define CONFIG_SUPPORT_VFAT
+:x
 
 /* EEPROM */
 #ifdef CONFIG_ENV_IS_IN_EEPROM

@@ -22,9 +22,16 @@
 #include <dwc3-uboot.h>
 #include <zynqmppl.h>
 #include <g_dnl.h>
+<<<<<<< HEAD
 #include <linux/sizes.h>
 
 #include "pm_cfg_obj.h"
+=======
+#include <spi.h>
+#include <spi_flash.h>
+#include <enclustra_qspi.h>
+#include <enclustra/eeprom-mac.h>
+>>>>>>> tags/v1.8.2
 
 DECLARE_GLOBAL_DATA_PTR;
 
@@ -271,6 +278,7 @@ static char *zynqmp_get_silicon_idcode_name(void)
 	ver = chip_id(IDCODE2);
 
 	for (i = 0; i < ARRAY_SIZE(zynqmp_devices); i++) {
+<<<<<<< HEAD
 		if (zynqmp_devices[i].id == id) {
 			if (zynqmp_devices[i].evexists &&
 			    !(ver & ZYNQMP_PL_STATUS_MASK))
@@ -278,6 +286,15 @@ static char *zynqmp_get_silicon_idcode_name(void)
 			if (zynqmp_devices[i].ver == (ver &
 			    ZYNQMP_CSU_VERSION_MASK))
 				break;
+=======
+		if ((zynqmp_devices[i].id == id) &&
+		    (zynqmp_devices[i].ver == (ver &
+		    ZYNQMP_CSU_VERSION_MASK))) {
+			snprintf(name, 3, "zu");
+			strncat(name, zynqmp_devices[i].name,
+				ZYNQMP_VERSION_SIZE - 3);
+			break;
+>>>>>>> tags/v1.8.2
 		}
 	}
 
@@ -495,6 +512,7 @@ void reset_cpu(ulong addr)
 {
 }
 
+<<<<<<< HEAD
 #if defined(CONFIG_BOARD_LATE_INIT)
 static const struct {
 	u32 bit;
@@ -574,6 +592,29 @@ static int set_fdtfile(void)
 int board_late_init(void)
 {
 	u32 reg = 0;
+=======
+#ifdef CONFIG_SCSI_AHCI_PLAT
+void scsi_init(void)
+{
+#if defined(CONFIG_SATA_CEVA)
+	init_sata(0);
+#endif
+	ahci_init((void __iomem *)ZYNQMP_SATA_BASEADDR);
+	scsi_scan(1);
+}
+#endif
+
+#if defined(CONFIG_ENCLUSTRA_EEPROM_MAC)
+static struct eeprom_mem eeproms[] = {
+	{.mac_reader = atsha204_get_mac },
+	{.mac_reader = ds28_get_mac }
+};
+#endif
+
+int board_late_init(void)
+{
+	u32 ver, reg, ret, i = 0;
+>>>>>>> tags/v1.8.2
 	u8 bootmode;
 	struct udevice *dev;
 	int bootseq = -1;
@@ -581,22 +622,116 @@ int board_late_init(void)
 	int env_targets_len = 0;
 	const char *mode;
 	char *new_targets;
+	u8 hwaddr[6] = {0, 0, 0, 0, 0, 0};
+	u32 hwaddr_h;
+	char hwaddr_str[18];
+	bool hwaddr_set;
 	char *env_targets;
+<<<<<<< HEAD
 	int ret;
 	ulong initrd_hi;
 
 #if defined(CONFIG_USB_ETHER) && !defined(CONFIG_USB_GADGET_DOWNLOAD)
 	usb_ether_init();
 #endif
+=======
+>>>>>>> tags/v1.8.2
 
-	if (!(gd->flags & GD_FLG_ENV_DEFAULT)) {
-		debug("Saved variables - Skipping\n");
-		return 0;
+	/* Probe the QSPI flash */
+#if defined(CONFIG_ENCLUSTRA_QSPI_FLASHMAP) && \
+    !defined(CONFIG_SPL_BUILD)
+	struct spi_flash *env_flash;
+	uint32_t flash_size;
+	env_flash = spi_flash_probe(0, 0, 1000000, SPI_MODE_3);
+	if (env_flash) {
+		flash_size = env_flash->size / 1024 / 1024;
+		setup_qspi_args(flash_size, zynqmp_get_silicon_idcode_name());
 	}
+#endif
 
+#if defined(CONFIG_ENCLUSTRA_EEPROM_MAC)
+	/* setup ethaddr */
+	hwaddr_set = false;
+	if (!env_get("ethaddr")) {
+		for (i = 0; i < ARRAY_SIZE(eeproms); i++) {
+			if (eeproms[i].mac_reader(hwaddr))
+				continue;
+
+			/* Workaround for incorrect MAC address caused by
+			 * flashing to EEPROM addresses like 20:B0:F0:XX:XX:XX
+			 * instead of 20:B0:F7:XX:XX:XX
+			 */
+			hwaddr[2] = (hwaddr[2] == 0xF0) ? 0xF7 : hwaddr[2];
+
+			/* Check if the value is a valid mac registered for
+			 * Enclustra  GmbH
+			 */
+			hwaddr_h = hwaddr[0] | hwaddr[1] << 8 | hwaddr[2] << 16;
+			if ((hwaddr_h & 0xFFFFFF) != ENCLUSTRA_MAC)
+				continue;
+
+			/* Format the address using a string */
+			sprintf(hwaddr_str,
+				"%02X:%02X:%02X:%02X:%02X:%02X",
+				hwaddr[0],
+				hwaddr[1],
+				hwaddr[2],
+				hwaddr[3],
+				hwaddr[4],
+				hwaddr[5]);
+
+			/* Set the actual env variable */
+			env_set("ethaddr", hwaddr_str);
+
+			/* increment MAC addr */
+			hwaddr_h = (hwaddr[3] << 16) | (hwaddr[4] << 8) | hwaddr[5];
+			hwaddr_h = (hwaddr_h + 1) & 0xFFFFFF;
+			hwaddr[3] = (hwaddr_h >> 16) & 0xFF;
+			hwaddr[4] = (hwaddr_h >> 8) & 0xFF;
+			hwaddr[5] = hwaddr_h & 0xFF;
+
+			/* Format the address using a string */
+			sprintf(hwaddr_str,
+				"%02X:%02X:%02X:%02X:%02X:%02X",
+				hwaddr[0],
+				hwaddr[1],
+				hwaddr[2],
+				hwaddr[3],
+				hwaddr[4],
+				hwaddr[5]);
+
+			/* Set the actual env variable */
+			env_set("eth1addr", hwaddr_str);
+			hwaddr_set = true;
+			break;
+		}
+
+		if (!hwaddr_set) {
+			env_set("ethaddr", ENCLUSTRA_ETHADDR_DEFAULT);
+			env_set("eth1addr", ENCLUSTRA_ETH1ADDR_DEFAULT);
+		}
+	}
+#endif
+
+<<<<<<< HEAD
 	ret = set_fdtfile();
 	if (ret)
 		return ret;
+=======
+	ver = zynqmp_get_silicon_version();
+
+	switch (ver) {
+	case ZYNQMP_CSU_VERSION_VELOCE:
+		env_set("setup", "env set baudrate 4800 && env set bootcmd run veloce");
+	case ZYNQMP_CSU_VERSION_EP108:
+	case ZYNQMP_CSU_VERSION_SILICON:
+	case ZYNQMP_CSU_VERSION_QEMU:
+		env_set("setup", "env set partid auto");
+		break;
+	default:
+		env_set("setup", "env set partid 0");
+	}
+>>>>>>> tags/v1.8.2
 
 	ret = zynqmp_mmio_read((ulong)&crlapb_base->boot_mode, &reg);
 	if (ret)
@@ -676,9 +811,29 @@ int board_late_init(void)
 		break;
 	}
 
+<<<<<<< HEAD
 	if (bootseq >= 0) {
 		bootseq_len = snprintf(NULL, 0, "%i", bootseq);
 		debug("Bootseq len: %x\n", bootseq_len);
+=======
+	if (!(gd->flags & GD_FLG_ENV_DEFAULT)) {
+		debug("Saved variables - Skipping\n");
+		return 0;
+	}
+
+	ver = zynqmp_get_silicon_version();
+
+	switch (ver) {
+	case ZYNQMP_CSU_VERSION_VELOCE:
+		env_set("setup", "env set baudrate 4800 && env set bootcmd run veloce");
+	case ZYNQMP_CSU_VERSION_EP108:
+	case ZYNQMP_CSU_VERSION_SILICON:
+		env_set("setup", "env set partid auto");
+		break;
+	case ZYNQMP_CSU_VERSION_QEMU:
+	default:
+		env_set("setup", "env set partid 0");
+>>>>>>> tags/v1.8.2
 	}
 
 	/*
