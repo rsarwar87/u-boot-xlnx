@@ -49,8 +49,6 @@
 
 	gpio-keys {
 		compatible = "gpio-keys";
-		#address-cells = <1>;
-		#size-cells = <0>;
 		autorepeat;
 		sw4 {
 			label = "sw4";
@@ -107,6 +105,7 @@
 
 	ltc2954: ltc2954 { /* U7 */
 		compatible = "lltc,ltc2954", "lltc,ltc2952";
+		status = "disabled";
 		trigger-gpios = <&gpio 26 GPIO_ACTIVE_LOW>; /* INT line - input */
 		/* If there is HW watchdog on mezzanine this signal should be connected there */
 		watchdog-gpios = <&gpio 35 GPIO_ACTIVE_HIGH>; /* MIO on PAD */
@@ -473,11 +472,11 @@
 &sdhci0 {
 	status = "okay";
 	no-1-8-v;
-	broken-cd; /* CD has to be enabled by default */
 	disable-wp;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_sdhci0_default>;
 	xlnx,mio_bank = <0>;
+	no-1-8-v;
 };
 
 &sdhci1 {
@@ -508,6 +507,7 @@
 &spi0 { /* Low Speed connector */
 	status = "okay";
 	label = "LS-SPI0";
+	num-cs = <1>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spi0_default>;
 };
@@ -515,6 +515,7 @@
 &spi1 { /* High Speed connector */
 	status = "okay";
 	label = "HS-SPI1";
+	num-cs = <1>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spi1_default>;
 };
@@ -527,7 +528,6 @@
 		compatible = "ti,wl1831-st";
 		enable-gpios = <&gpio 8 GPIO_ACTIVE_HIGH>;
 	};
-
 };
 
 &uart1 {

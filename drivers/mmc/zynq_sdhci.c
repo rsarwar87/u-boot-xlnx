@@ -1,30 +1,32 @@
+// SPDX-License-Identifier: GPL-2.0+
 /*
  * (C) Copyright 2013 - 2015 Xilinx, Inc.
  *
  * Xilinx Zynq SD Host Controller Interface
- *
- * SPDX-License-Identifier:	GPL-2.0+
  */
 
 #include <clk.h>
 #include <common.h>
 #include <dm.h>
 #include <fdtdec.h>
-#include <libfdt.h>
+#include "mmc_private.h"
+#include <linux/libfdt.h>
 #include <malloc.h>
 #include <sdhci.h>
-#include <mmc.h>
-#include <asm/arch/hardware.h>
-#include <asm/arch/sys_proto.h>
-#include <asm/io.h>
 #include <zynqmp_tap_delay.h>
-#include "mmc_private.h"
 
 DECLARE_GLOBAL_DATA_PTR;
 
-#ifndef CONFIG_ZYNQ_SDHCI_MIN_FREQ
-# define CONFIG_ZYNQ_SDHCI_MIN_FREQ	0
-#endif
+#define ZYNQMP_ITAP_DELAYS		{0x0, 0x15, 0x0, 0x0, 0x3D, 0x0,\
+					 0x15, 0x12, 0x15}
+#define ZYNQMP_OTAP_DELAYS		{0x0, 0x5, 0x3, 0x3, 0x4, 0x3,\
+					 0x5, 0x6, 0x6}
+#define VERSAL_ITAP_DELAYS		{0x0, 0x2C, 0x0, 0x0, 0x36, 0x0,\
+					 0x2C, 0x1E, 0x2C}
+#define VERSAL_OTAP_DELAYS		{0x0, 0x4, 0x3, 0x2, 0x3, 0x2,\
+					 0x4, 0x5, 0x5}
+
+#define MMC_BANK2			0x2
 
 struct arasan_sdhci_plat {
 	struct mmc_config cfg;
@@ -34,13 +36,40 @@ struct arasan_sdhci_plat {
 
 struct arasan_sdhci_priv {
 	struct sdhci_host *host;
+	u32 itapdly[MMC_MAX_BUS_SPEED];
+	u32 otapdly[MMC_MAX_BUS_SPEED];
 	u8 deviceid;
 	u8 bank;
 	u8 no_1p8;
-	bool pwrseq;
 };
 
-#if defined(CONFIG_ARCH_ZYNQMP)
+#if defined(CONFIG_ARCH_ZYNQMP) || defined(CONFIG_ARCH_VERSAL)
+#define MMC_HS200_BUS_SPEED	5
+
+#define MMC_TIMING_UHS_SDR12    0
+#define MMC_TIMING_UHS_SDR25    1
+#define MMC_TIMING_UHS_SDR50    2
+#define MMC_TIMING_UHS_SDR104   3
+#define MMC_TIMING_UHS_DDR50    4
+#define MMC_TIMING_HS200        5
+
+static const u8 mode2timing[] = {
+	[MMC_LEGACY] = UHS_SDR12_BUS_SPEED,
+	[SD_LEGACY] = UHS_SDR12_BUS_SPEED,
+	[MMC_HS] = HIGH_SPEED_BUS_SPEED,
+	[SD_HS] = HIGH_SPEED_BUS_SPEED,
+	[MMC_HS_52] = HIGH_SPEED_BUS_SPEED,
+	[MMC_DDR_52] = HIGH_SPEED_BUS_SPEED,
+	[UHS_SDR12] = UHS_SDR12_BUS_SPEED,
+	[UHS_SDR25] = UHS_SDR25_BUS_SPEED,
+	[UHS_SDR50] = UHS_SDR50_BUS_SPEED,
+	[UHS_DDR50] = UHS_DDR50_BUS_SPEED,
+	[UHS_SDR104] = UHS_SDR104_BUS_SPEED,
+	[MMC_HS_200] = MMC_HS200_BUS_SPEED,
+};
+
+#define SDHCI_TUNING_LOOP_COUNT	40
+
 static void arasan_zynqmp_dll_reset(struct sdhci_host *host, u8 deviceid)
 {
 	u16 clk;
@@ -77,7 +106,7 @@ static int arasan_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 	u32 ctrl;
 	struct sdhci_host *host;
 	struct arasan_sdhci_priv *priv = dev_get_priv(mmc->dev);
-	u8 tuning_loop_counter = 40;
+	char tuning_loop_counter = SDHCI_TUNING_LOOP_COUNT;
 	u8 deviceid;
 
 	debug("%s\n", __func__);
@@ -85,9 +114,9 @@ static int arasan_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 	host = priv->host;
 	deviceid = priv->deviceid;
 
-	ctrl = sdhci_readw(host, SDHCI_HOST_CTRL2);
+	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 	ctrl |= SDHCI_CTRL_EXEC_TUNING;
-	sdhci_writew(host, ctrl, SDHCI_HOST_CTRL2);
+	sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
 
 	mdelay(1);
 
@@ -119,7 +148,7 @@ static int arasan_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 		sdhci_writew(host, SDHCI_TRNS_READ, SDHCI_TRANSFER_MODE);
 
 		mmc_send_cmd(mmc, &cmd, NULL);
-		ctrl = sdhci_readw(host, SDHCI_HOST_CTRL2);
+		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 
 		if (cmd.cmdidx == MMC_CMD_SEND_TUNING_BLOCK)
 			udelay(1);
@@ -128,16 +157,16 @@ static int arasan_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 
 	if (tuning_loop_counter < 0) {
 		ctrl &= ~SDHCI_CTRL_TUNED_CLK;
-		sdhci_writel(host, ctrl, SDHCI_HOST_CTRL2);
+		sdhci_writel(host, ctrl, SDHCI_HOST_CONTROL2);
 	}
 
 	if (!(ctrl & SDHCI_CTRL_TUNED_CLK)) {
-		debug("%s:Tuning failed\n", __func__);
+		printf("%s:Tuning failed\n", __func__);
 		return -1;
-	} else {
-		udelay(1);
-		arasan_zynqmp_dll_reset(host, deviceid);
 	}
+
+	udelay(1);
+	arasan_zynqmp_dll_reset(host, deviceid);
 
 	/* Enable only interrupts served by the SD controller */
 	sdhci_writel(host, SDHCI_INT_DATA_MASK | SDHCI_INT_CMD_MASK,
@@ -148,28 +177,200 @@ static int arasan_sdhci_execute_tuning(struct mmc *mmc, u8 opcode)
 	return 0;
 }
 
+#if defined(CONFIG_ARCH_VERSAL)
+#define SDHCI_ARASAN_ITAPDLY_REGISTER   0xF0F8
+#define SDHCI_ARASAN_OTAPDLY_REGISTER   0xF0FC
+
+#define SDHCI_ITAPDLY_CHGWIN            0x200
+#define SDHCI_ITAPDLY_ENABLE            0x100
+#define SDHCI_OTAPDLY_ENABLE            0x40
+
+static void arasan_set_tapdelay(struct sdhci_host *host, u32 itap_delay,
+				u32 otap_delay)
+{
+	u32 regval;
+
+	if (itap_delay) {
+		regval = sdhci_readl(host, SDHCI_ARASAN_ITAPDLY_REGISTER);
+		regval |= SDHCI_ITAPDLY_CHGWIN;
+		sdhci_writel(host, regval, SDHCI_ARASAN_ITAPDLY_REGISTER);
+		regval |= SDHCI_ITAPDLY_ENABLE;
+		regval = sdhci_readl(host, SDHCI_ARASAN_ITAPDLY_REGISTER);
+		regval |= SDHCI_ITAPDLY_CHGWIN;
+		sdhci_writel(host, regval, SDHCI_ARASAN_ITAPDLY_REGISTER);
+		regval |= SDHCI_ITAPDLY_ENABLE;
+		sdhci_writel(host, regval, SDHCI_ARASAN_ITAPDLY_REGISTER);
+		regval |= itap_delay;
+		sdhci_writel(host, regval, SDHCI_ARASAN_ITAPDLY_REGISTER);
+		regval &= ~SDHCI_ITAPDLY_CHGWIN;
+		sdhci_writel(host, regval, SDHCI_ARASAN_ITAPDLY_REGISTER);
+	}
+
+	if (otap_delay) {
+		regval = sdhci_readl(host, SDHCI_ARASAN_OTAPDLY_REGISTER);
+		regval |= SDHCI_OTAPDLY_ENABLE;
+		sdhci_writel(host, regval, SDHCI_ARASAN_OTAPDLY_REGISTER);
+		regval |= otap_delay;
+		sdhci_writel(host, regval, SDHCI_ARASAN_OTAPDLY_REGISTER);
+	}
+}
+#endif
+
 static void arasan_sdhci_set_tapdelay(struct sdhci_host *host)
 {
 	struct arasan_sdhci_priv *priv = dev_get_priv(host->mmc->dev);
 	struct mmc *mmc = (struct mmc *)host->mmc;
 	u8 uhsmode;
+	u32 itap_delay;
+	u32 otap_delay;
 
-	if (mmc->is_uhs)
-		uhsmode = mmc->uhsmode;
-	else if (mmc->card_caps & MMC_MODE_HS)
-		uhsmode = MMC_TIMING_HS;
-	else if (mmc->card_caps & MMC_MODE_HS200)
-		uhsmode = MMC_TIMING_HS200;
-	else
-		return;
+	uhsmode = mode2timing[mmc->selected_mode];
 
 	debug("%s, host:%s devId:%d, bank:%d, mode:%d\n", __func__, host->name,
 	      priv->deviceid, priv->bank, uhsmode);
 	if ((uhsmode >= MMC_TIMING_UHS_SDR25) &&
-	    (uhsmode <= MMC_TIMING_HS200))
-		arasan_zynqmp_set_tapdelay(priv->deviceid, uhsmode,
-					   priv->bank);
+	    (uhsmode <= MMC_TIMING_HS200)) {
+		itap_delay = priv->itapdly[uhsmode];
+		otap_delay = priv->otapdly[uhsmode];
+#if defined(CONFIG_ARCH_ZYNQMP)
+		arasan_zynqmp_set_tapdelay(priv->deviceid, itap_delay,
+					   otap_delay);
+#elif defined(CONFIG_ARCH_VERSAL)
+		arasan_set_tapdelay(host, itap_delay, otap_delay);
+#endif
+	}
 }
+
+static void arasan_dt_read_tap_delay(struct udevice *dev, u32 *tapdly,
+				     u8 mode, const char *prop)
+{
+	/*
+	 * Read Tap Delay values from DT, if the DT does not contain the
+	 * Tap Values then use the pre-defined values
+	 */
+	if (dev_read_u32(dev, prop, &tapdly[mode])) {
+		dev_dbg(dev, "Using predefined tapdly for %s = %d\n",
+			prop, tapdly[mode]);
+	}
+}
+
+/**
+ * arasan_zynqmp_dt_parse_tap_delays - Read Tap Delay values from DT
+ *
+ * Called at initialization to parse the values of Tap Delays.
+ *
+ * @dev:                Pointer to our struct udevice.
+ */
+static void arasan_zynqmp_dt_parse_tap_delays(struct udevice *dev)
+{
+	struct arasan_sdhci_priv *priv = dev_get_priv(dev);
+	u32 *itapdly;
+	u32 *otapdly;
+	int i;
+
+	if (ofnode_device_is_compatible(dev_ofnode(dev), "xlnx,zynqmp-8.9a")) {
+		itapdly = (u32 [MMC_MAX_BUS_SPEED]) ZYNQMP_ITAP_DELAYS;
+		otapdly = (u32 [MMC_MAX_BUS_SPEED]) ZYNQMP_OTAP_DELAYS;
+	} else {
+		itapdly = (u32 [MMC_MAX_BUS_SPEED]) VERSAL_ITAP_DELAYS;
+		otapdly = (u32 [MMC_MAX_BUS_SPEED]) VERSAL_OTAP_DELAYS;
+	}
+
+	/* as of now bank2 tap delays are same for zynqmp and versal */
+	if (priv->bank == MMC_BANK2) {
+		itapdly[MMC_TIMING_UHS_SDR104] = 0x0;
+		otapdly[MMC_TIMING_UHS_SDR104] = 0x2;
+		itapdly[MMC_TIMING_HS200] = 0x0;
+		otapdly[MMC_TIMING_HS200] = 0x2;
+	}
+
+	arasan_dt_read_tap_delay(dev, itapdly, SD_HS_BUS_SPEED,
+				 "xlnx,itap-delay-sd-hsd");
+	arasan_dt_read_tap_delay(dev, itapdly, MMC_TIMING_UHS_SDR25,
+				 "xlnx,itap-delay-sdr25");
+	arasan_dt_read_tap_delay(dev, itapdly, MMC_TIMING_UHS_SDR50,
+				 "xlnx,itap-delay-sdr50");
+	arasan_dt_read_tap_delay(dev, itapdly, MMC_TIMING_UHS_SDR104,
+				 "xlnx,itap-delay-sdr104");
+	arasan_dt_read_tap_delay(dev, itapdly, MMC_TIMING_UHS_DDR50,
+				 "xlnx,itap-delay-sd-ddr50");
+	arasan_dt_read_tap_delay(dev, itapdly, MMC_HS_BUS_SPEED,
+				 "xlnx,itap-delay-mmc-hsd");
+	arasan_dt_read_tap_delay(dev, itapdly, MMC_DDR52_BUS_SPEED,
+				 "xlnx,itap-delay-mmc-ddr52");
+	arasan_dt_read_tap_delay(dev, itapdly, MMC_TIMING_HS200,
+				 "xlnx,itap-delay-mmc-hs200");
+	arasan_dt_read_tap_delay(dev, otapdly, SD_HS_BUS_SPEED,
+				 "xlnx,otap-delay-sd-hsd");
+	arasan_dt_read_tap_delay(dev, otapdly, MMC_TIMING_UHS_SDR25,
+				 "xlnx,otap-delay-sdr25");
+	arasan_dt_read_tap_delay(dev, otapdly, MMC_TIMING_UHS_SDR50,
+				 "xlnx,otap-delay-sdr50");
+	arasan_dt_read_tap_delay(dev, otapdly, MMC_TIMING_UHS_SDR104,
+				 "xlnx,otap-delay-sdr104");
+	arasan_dt_read_tap_delay(dev, otapdly, MMC_TIMING_UHS_DDR50,
+				 "xlnx,otap-delay-sd-ddr50");
+	arasan_dt_read_tap_delay(dev, otapdly, MMC_HS_BUS_SPEED,
+				 "xlnx,otap-delay-mmc-hsd");
+	arasan_dt_read_tap_delay(dev, otapdly, MMC_DDR52_BUS_SPEED,
+				 "xlnx,otap-delay-mmc-ddr52");
+	arasan_dt_read_tap_delay(dev, otapdly, MMC_TIMING_HS200,
+				 "xlnx,otap-delay-mmc-hs200");
+
+	for (i = 0; i < MMC_MAX_BUS_SPEED; i++) {
+		priv->itapdly[i] = itapdly[i];
+		priv->otapdly[i] = otapdly[i];
+	}
+}
+
+static void arasan_sdhci_set_control_reg(struct sdhci_host *host)
+{
+	struct mmc *mmc = (struct mmc *)host->mmc;
+	u32 reg;
+
+	if (!IS_SD(mmc))
+		return;
+
+	if (mmc->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
+		reg = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+		reg |= SDHCI_CTRL_VDD_180;
+		sdhci_writew(host, reg, SDHCI_HOST_CONTROL2);
+	}
+
+	if (mmc->selected_mode > SD_HS &&
+	    mmc->selected_mode <= MMC_HS_200) {
+		reg = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+		reg &= ~SDHCI_CTRL_UHS_MASK;
+		switch (mmc->selected_mode) {
+		case UHS_SDR12:
+			reg |= UHS_SDR12_BUS_SPEED;
+			break;
+		case UHS_SDR25:
+			reg |= UHS_SDR25_BUS_SPEED;
+			break;
+		case UHS_SDR50:
+			reg |= UHS_SDR50_BUS_SPEED;
+			break;
+		case UHS_SDR104:
+		case MMC_HS_200:
+			reg |= UHS_SDR104_BUS_SPEED;
+			break;
+		case UHS_DDR50:
+		case MMC_DDR_52:
+			reg |= UHS_DDR50_BUS_SPEED;
+			break;
+		default:
+			break;
+		}
+		sdhci_writew(host, reg, SDHCI_HOST_CONTROL2);
+	}
+}
+
+const struct sdhci_ops arasan_ops = {
+	.platform_execute_tuning	= &arasan_sdhci_execute_tuning,
+	.set_delay = &arasan_sdhci_set_tapdelay,
+	.set_control_reg = &arasan_sdhci_set_control_reg,
+};
 #endif
 
 static int arasan_sdhci_probe(struct udevice *dev)
@@ -182,6 +383,8 @@ static int arasan_sdhci_probe(struct udevice *dev)
 	unsigned long clock;
 	int ret;
 
+	host = priv->host;
+
 	ret = clk_get_by_index(dev, 0, &clk);
 	if (ret < 0) {
 		dev_err(dev, "failed to get clock\n");
@@ -193,6 +396,7 @@ static int arasan_sdhci_probe(struct udevice *dev)
 		dev_err(dev, "failed to get rate\n");
 		return clock;
 	}
+
 	debug("%s: CLK %ld\n", __func__, clock);
 
 	ret = clk_enable(&clk);
@@ -201,14 +405,11 @@ static int arasan_sdhci_probe(struct udevice *dev)
 		return ret;
 	}
 
-	host = priv->host;
-
 	host->quirks = SDHCI_QUIRK_WAIT_SEND_CMD |
-		       SDHCI_QUIRK_BROKEN_R1B |
-		       SDHCI_QUIRK_USE_ACMD12;
+		       SDHCI_QUIRK_BROKEN_R1B;
 
 #ifdef CONFIG_ZYNQ_HISPD_BROKEN
-	host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+	host->quirks |= SDHCI_QUIRK_BROKEN_HISPD_MODE;
 #endif
 
 	if (priv->no_1p8)
@@ -216,30 +417,17 @@ static int arasan_sdhci_probe(struct udevice *dev)
 
 	host->max_clk = clock;
 
+	host->mmc = &plat->mmc;
+	host->mmc->dev = dev;
+	host->mmc->priv = host;
+
 	ret = sdhci_setup_cfg(&plat->cfg, host, plat->f_max,
 			      CONFIG_ZYNQ_SDHCI_MIN_FREQ);
-	host->mmc = &plat->mmc;
 	if (ret)
 		return ret;
-	host->mmc->priv = host;
-	host->mmc->dev = dev;
 	upriv->mmc = host->mmc;
 
-#if defined(CONFIG_ARCH_ZYNQMP)
-	host->set_delay = arasan_sdhci_set_tapdelay;
-	host->platform_execute_tuning = arasan_sdhci_execute_tuning;
-#endif
-
-	if (priv->pwrseq) {
-		debug("Unsupported mmcpwrseq for %s\n", dev->name);
-		return 0;
-	}
-
-	ret = sdhci_probe(dev);
-	if (ret)
-		return ret;
-
-	return mmc_init(&plat->mmc);
+	return sdhci_probe(dev);
 }
 
 static int arasan_sdhci_ofdata_to_platdata(struct udevice *dev)
@@ -248,33 +436,25 @@ static int arasan_sdhci_ofdata_to_platdata(struct udevice *dev)
 	struct arasan_sdhci_priv *priv = dev_get_priv(dev);
 
 	priv->host = calloc(1, sizeof(struct sdhci_host));
-	if (priv->host == NULL)
+	if (!priv->host)
 		return -1;
 
 	priv->host->name = dev->name;
-	priv->host->ioaddr = (void *)devfdt_get_addr(dev);
 
-	plat->f_max = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
-				"max-frequency", CONFIG_ZYNQ_SDHCI_MAX_FREQ);
-
-	priv->deviceid = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
-					"xlnx,device_id", -1);
-	priv->bank = fdtdec_get_int(gd->fdt_blob, dev_of_offset(dev),
-				    "xlnx,mio_bank", -1);
-
-	if (fdt_get_property(gd->fdt_blob, dev_of_offset(dev), "no-1-8-v", NULL)
-#if defined(CONFIG_ARCH_ZYNQMP)
-	    || (chip_id(VERSION) == ZYNQMP_SILICON_V1)
+#if defined(CONFIG_ARCH_ZYNQMP) || defined(CONFIG_ARCH_VERSAL)
+	priv->host->ops = &arasan_ops;
+	arasan_zynqmp_dt_parse_tap_delays(dev);
 #endif
-	    )
-		priv->no_1p8 = 1;
-	else
-		priv->no_1p8 = 0;
 
-	if (fdt_get_property(gd->fdt_blob, dev_of_offset(dev), "mmc-pwrseq",
-			     NULL))
-		priv->pwrseq = true;
+	priv->host->ioaddr = (void *)dev_read_addr(dev);
+	if (IS_ERR(priv->host->ioaddr))
+		return PTR_ERR(priv->host->ioaddr);
 
+	priv->deviceid = dev_read_u32_default(dev, "xlnx,device_id", -1);
+	priv->bank = dev_read_u32_default(dev, "xlnx,mio_bank", -1);
+	priv->no_1p8 = dev_read_bool(dev, "no-1-8-v");
+	plat->f_max = dev_read_u32_default(dev, "max-frequency",
+					   CONFIG_ZYNQ_SDHCI_MAX_FREQ);
 	return 0;
 }
 
